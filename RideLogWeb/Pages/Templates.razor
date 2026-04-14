@@ -2,6 +2,7 @@
 @using RideLogWeb.Models
 @using RideLogWeb.Services
 @inject ActivityService ActivityService
+@inject IJSRuntime JSRuntime
 
 <h1>📁 Vorlagen</h1>
 
@@ -109,6 +110,7 @@ else
     private async Task LoadAsync()
     {
         templates = await ActivityService.GetTemplatesAsync();
+        StateHasChanged();
     }
 
     private void StartEdit(Activity template)
@@ -127,7 +129,17 @@ else
     private async Task SaveEdit()
     {
         if (editingTemplate is null) return;
-        await ActivityService.SaveActivityAsync(editingTemplate);
+
+        var saved = await ActivityService
+            .SaveTemplateIfUniqueAsync(editingTemplate);
+
+        if (!saved)
+        {
+            await JSRuntime.InvokeVoidAsync("alert",
+                $"Vorlage '{editingTemplate.Title}' existiert bereits!");
+            return;
+        }
+
         editingTemplate = null;
         await LoadAsync();
     }

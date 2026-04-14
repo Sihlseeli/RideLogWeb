@@ -51,6 +51,7 @@ else
     private async Task LoadAsync()
     {
         activities = await ActivityService.GetActivitiesAsync();
+        StateHasChanged();
     }
 
     private async Task DeleteActivity(Activity activity)
@@ -58,4 +59,5 @@ else
         await ActivityService.DeleteActivityAsync(activity);
         await LoadAsync();
     }
+
 }

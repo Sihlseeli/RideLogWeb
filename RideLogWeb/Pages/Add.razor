@@ -149,9 +149,14 @@
             IsTemplate = true
         };
 
-        await ActivityService.SaveActivityAsync(template);
-        templates = await ActivityService.GetTemplatesAsync();
+        var saved = await ActivityService.SaveTemplateIfUniqueAsync(template);
+        if (!saved)
+        {
+            errorMessage = $"Vorlage '{activity.Title}' existiert bereits!";
+            return;
+        }
 
+        templates = await ActivityService.GetTemplatesAsync();
         successMessage = true;
     }
 }

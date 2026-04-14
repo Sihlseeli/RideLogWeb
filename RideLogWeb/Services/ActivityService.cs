@@ -15,8 +15,15 @@ public class ActivityService
 
     private async Task<List<Activity>> GetAllAsync()
     {
-        return await _localStorage
-            .GetItemAsync<List<Activity>>(Key) ?? new List<Activity>();
+        try
+        {
+            return await _localStorage
+                .GetItemAsync<List<Activity>>(Key) ?? new List<Activity>();
+        }
+        catch
+        {
+            return new List<Activity>();
+        }
     }
 
     private async Task SaveAllAsync(List<Activity> activities)
@@ -44,13 +51,18 @@ public class ActivityService
 
         if (activity.Id == 0)
         {
+            // Neue ID generieren
             activity.Id = all.Count > 0 ? all.Max(a => a.Id) + 1 : 1;
             all.Add(activity);
         }
         else
         {
+            // Bestehenden Eintrag aktualisieren
             var index = all.FindIndex(a => a.Id == activity.Id);
-            if (index >= 0) all[index] = activity;
+            if (index >= 0)
+                all[index] = activity;
+            else
+                all.Add(activity);
         }
 
         await SaveAllAsync(all);
@@ -59,7 +71,22 @@ public class ActivityService
     public async Task DeleteActivityAsync(Activity activity)
     {
         var all = await GetAllAsync();
+        var before = all.Count;
         all.RemoveAll(a => a.Id == activity.Id);
         await SaveAllAsync(all);
+    }
+
+    // Vorlage nur speichern wenn Name noch nicht existiert
+    public async Task<bool> SaveTemplateIfUniqueAsync(Activity template)
+    {
+        var all = await GetAllAsync();
+        var exists = all.Any(a => a.IsTemplate &&
+            a.Title.Trim().ToLower() == template.Title.Trim().ToLower() &&
+            a.Id != template.Id);
+
+        if (exists) return false;
+
+        await SaveActivityAsync(template);
+        return true;
     }
 }
