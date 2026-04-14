@@ -30,18 +30,88 @@ else
                     </div>
                     <div class="activity-hm">@a.ElevationMeters hm</div>
                 </div>
+                <button @onclick="() => StartEdit(a)"
+                        style="background:none; border:none;
+                    font-size:18px; cursor:pointer;">
+                    ✏️
+                </button>
                 <button @onclick="() => DeleteActivity(a)"
                         style="background:none; border:none;
                     font-size:18px; cursor:pointer;">
                     🗑️
                 </button>
             </div>
+
+            <!-- Inline Bearbeiten -->
+            @if (editingActivity?.Id == a.Id)
+            {
+                <div style="padding:12px; background:#f9f9f9;
+                    border-radius:8px; margin-bottom:8px;">
+
+                    <div class="form-group">
+                        <label>Datum</label>
+                        <input type="date"
+                               @bind="editingActivity.Date" />
+                    </div>
+
+                    <div class="form-group">
+                        <label>Titel</label>
+                        <input type="text"
+                               @bind="editingActivity.Title" />
+                    </div>
+
+                    <div class="form-group">
+                        <label>Kategorie</label>
+                        <select @bind="editingActivity.BikeType">
+                            <option value="@BikeType.Gravel">
+                                🚴 Gravel
+                            </option>
+                            <option value="@BikeType.MTB">
+                                🚵 MTB
+                            </option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Kilometer</label>
+                        <input type="number" step="0.1"
+                               @bind="editingActivity.Kilometers" />
+                    </div>
+
+                    <div class="form-group">
+                        <label>Höhenmeter</label>
+                        <input type="number"
+                               @bind="editingActivity.ElevationMeters" />
+                    </div>
+
+                    <div class="form-group">
+                        <label>Dauer in Minuten (optional)</label>
+                        <input type="number"
+                               @bind="editingActivity.DurationMinutes" />
+                    </div>
+
+                    <div class="form-group">
+                        <label>Notiz (optional)</label>
+                        <textarea @bind="editingActivity.Note"></textarea>
+                    </div>
+
+                    <button class="btn btn-green"
+                            @onclick="SaveEdit">
+                        💾 Speichern
+                    </button>
+                    <button class="btn btn-gray"
+                            @onclick="CancelEdit">
+                        Abbrechen
+                    </button>
+                </div>
+            }
         }
     </div>
 }
 
 @code {
     private List<Activity> activities = new();
+    private Activity? editingActivity;
 
     protected override async Task OnInitializedAsync()
     {
@@ -54,10 +124,38 @@ else
         StateHasChanged();
     }
 
+    private void StartEdit(Activity activity)
+    {
+        editingActivity = new Activity
+        {
+            Id = activity.Id,
+            Date = activity.Date,
+            Title = activity.Title,
+            BikeType = activity.BikeType,
+            Kilometers = activity.Kilometers,
+            ElevationMeters = activity.ElevationMeters,
+            DurationMinutes = activity.DurationMinutes,
+            Note = activity.Note,
+            IsTemplate = false
+        };
+    }
+
+    private async Task SaveEdit()
+    {
+        if (editingActivity is null) return;
+        await ActivityService.SaveActivityAsync(editingActivity);
+        editingActivity = null;
+        await LoadAsync();
+    }
+
+    private void CancelEdit()
+    {
+        editingActivity = null;
+    }
+
     private async Task DeleteActivity(Activity activity)
     {
         await ActivityService.DeleteActivityAsync(activity);
         await LoadAsync();
     }
-
 }
