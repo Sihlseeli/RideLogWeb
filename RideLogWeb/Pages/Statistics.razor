@@ -1,0 +1,190 @@
+﻿@page "/statistics"
+@using RideLogWeb.Models
+@using RideLogWeb.Services
+@inject ActivityService ActivityService
+
+<h1>📊 Statistiken</h1>
+
+<!-- Jahr auswählen -->
+<div class="card">
+    <div class="form-group">
+        <label>📅 Jahr auswählen</label>
+        <select @bind="selectedYear" @bind:after="LoadAsync">
+            @foreach (var y in availableYears)
+            {
+                <option value="@y">@y</option>
+            }
+        </select>
+    </div>
+</div>
+
+@if (totalRides == 0)
+{
+    <div class="empty-state">Keine Fahrten in @selectedYear 🚴</div>
+}
+else
+{
+    <!-- Jahresübersicht -->
+    <div class="card">
+        <h2>📊 Jahresübersicht @selectedYear</h2>
+        <div class="stat-grid">
+
+            <div class="stat-tile" style="background:#E8F5E9">
+                <div class="stat-label">Total Kilometer</div>
+                <div class="stat-value" style="color:#2E7D32">
+                    @totalKm.ToString("F0") km
+                </div>
+            </div>
+
+            <div class="stat-tile" style="background:#E3F2FD">
+                <div class="stat-label">Total Höhenmeter</div>
+                <div class="stat-value" style="color:#1565C0">
+                    @totalHm hm
+                </div>
+            </div>
+
+            <div class="stat-tile" style="background:#FFF3E0">
+                <div class="stat-label">Fahrten</div>
+                <div class="stat-value" style="color:#E65100">
+                    @totalRides
+                </div>
+            </div>
+
+            <div class="stat-tile" style="background:#F3E5F5">
+                <div class="stat-label">Bester Monat</div>
+                <div class="stat-value" style="color:#6A1B9A">
+                    @bestMonth
+                </div>
+            </div>
+
+            <div class="stat-tile" style="background:#E0F7FA">
+                <div class="stat-label">Ø pro Fahrt</div>
+                <div class="stat-value" style="color:#00695C">
+                    @avgKm.ToString("F1") km
+                </div>
+            </div>
+
+            <div class="stat-tile" style="background:#FCE4EC">
+                <div class="stat-label">Längste Fahrt</div>
+                <div class="stat-value" style="color:#880E4F">
+                    @longestRide.ToString("F1") km
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Monatsübersicht -->
+    <div class="card">
+        <h2>📅 Monatsübersicht</h2>
+        @foreach (var m in monthStats)
+        {
+            <div style="display:flex; align-items:center;
+                gap:8px; padding:6px 0;
+                border-bottom:1px solid #f0f0f0;">
+                <div style="width:36px; font-weight:bold;
+                    font-size:13px;">
+                    @m.Month
+                </div>
+                <div style="flex:1; background:#e0e0e0;
+                    border-radius:4px; height:20px;">
+                    <div style="background:#2E7D32;
+                        border-radius:4px; height:20px;
+                        width:@(GetBarWidth(m.Kilometers))%">
+                    </div>
+                </div>
+                <div style="width:60px; font-size:12px;
+                    color:#2E7D32; font-weight:bold;">
+                    @m.Kilometers.ToString("F0") km
+                </div>
+                <div style="width:24px; font-size:12px; color:#888;">
+                    @m.Count x
+                </div>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private int selectedYear = DateTime.Today.Year;
+    private List<int> availableYears = new();
+    private double totalKm;
+    private int totalHm;
+    private int totalRides;
+    private double avgKm;
+    private double longestRide;
+    private string bestMonth = string.Empty;
+    private List<MonthStat> monthStats = new();
+    private double maxMonthKm = 1;
+
+    private class MonthStat
+    {
+        public string Month { get; set; } = string.Empty;
+        public double Kilometers { get; set; }
+        public int Elevation { get; set; }
+        public int Count { get; set; }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var all = await ActivityService.GetActivitiesAsync();
+        var years = all.Select(a => a.Date.Year)
+            .Distinct()
+            .OrderByDescending(y => y)
+            .ToList();
+
+        if (!years.Contains(selectedYear))
+            years.Insert(0, selectedYear);
+
+        availableYears = years;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        var all = await ActivityService.GetActivitiesAsync();
+        var filtered = all
+            .Where(a => a.Date.Year == selectedYear)
+            .ToList();
+
+        totalKm = filtered.Sum(a => a.Kilometers);
+        totalHm = filtered.Sum(a => a.ElevationMeters);
+        totalRides = filtered.Count;
+        avgKm = totalRides > 0 ? totalKm / totalRides : 0;
+        longestRide = filtered.Any()
+            ? filtered.Max(a => a.Kilometers) : 0;
+
+        if (filtered.Any())
+        {
+            var bestM = filtered
+                .GroupBy(a => a.Date.Month)
+                .OrderByDescending(g => g.Sum(a => a.Kilometers))
+                .First();
+            bestMonth = new DateTime(selectedYear, bestM.Key, 1)
+                .ToString("MMMM");
+        }
+
+        monthStats = Enumerable.Range(1, 12).Select(m =>
+        {
+            var rides = filtered
+                .Where(a => a.Date.Month == m).ToList();
+            return new MonthStat
+            {
+                Month = new DateTime(selectedYear, m, 1)
+                    .ToString("MMM"),
+                Kilometers = rides.Sum(a => a.Kilometers),
+                Elevation = rides.Sum(a => a.ElevationMeters),
+                Count = rides.Count
+            };
+        }).ToList();
+
+        maxMonthKm = monthStats.Any()
+            ? monthStats.Max(m => m.Kilometers) : 1;
+        if (maxMonthKm == 0) maxMonthKm = 1;
+    }
+
+    private double GetBarWidth(double km)
+    {
+        return Math.Round((km / maxMonthKm) * 100, 1);
+    }
+}

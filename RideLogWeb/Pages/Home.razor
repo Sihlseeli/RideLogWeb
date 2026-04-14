@@ -1,0 +1,116 @@
+﻿@page "/"
+@using RideLogWeb.Models
+@using RideLogWeb.Services
+@inject ActivityService ActivityService
+
+<h1>@greeting</h1>
+
+<!-- Jahreskarte -->
+<div class="card card-green">
+    <div style="font-size:14px; margin-bottom:8px;">
+        🗓️ Jahr @DateTime.Today.Year
+    </div>
+    <div class="stat-grid">
+        <div>
+            <div class="stat-value" style="color:white">
+                @yearKm.ToString("F0") km
+            </div>
+            <div class="stat-label" style="color:#A5D6A7">Kilometer</div>
+        </div>
+        <div>
+            <div class="stat-value" style="color:white">@yearHm hm</div>
+            <div class="stat-label" style="color:#A5D6A7">Höhenmeter</div>
+        </div>
+        <div>
+            <div class="stat-value" style="color:white">@totalRides</div>
+            <div class="stat-label" style="color:#A5D6A7">Fahrten</div>
+        </div>
+    </div>
+</div>
+
+<!-- Gravel vs MTB -->
+<div class="card">
+    <h2>🚴 vs 🚵 dieses Jahr</h2>
+    <div class="stat-grid">
+        <div class="stat-tile" style="background:#E3F2FD">
+            <div class="stat-label">🚴 Gravel</div>
+            <div class="stat-value" style="color:#1565C0">
+                @gravelKm.ToString("F0") km
+            </div>
+        </div>
+        <div class="stat-tile" style="background:#FFF3E0">
+            <div class="stat-label">🚵 MTB</div>
+            <div class="stat-value" style="color:#E65100">
+                @mtbKm.ToString("F0") km
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Letzte Fahrten -->
+<div class="card">
+    <h2>🕐 Letzte Fahrten</h2>
+    @if (!recentActivities.Any())
+    {
+        <div class="empty-state">Noch keine Fahrten erfasst 🚴</div>
+    }
+    else
+    {
+        @foreach (var a in recentActivities)
+        {
+            <div class="activity-item">
+                <div class="activity-icon">
+                    @(a.BikeType == BikeType.MTB ? "🚵" : "🚴")
+                </div>
+                <div class="activity-info">
+                    <div class="activity-title">@a.Title</div>
+                    <div class="activity-date">
+                        @a.Date.ToString("dd.MM.yyyy")
+                    </div>
+                </div>
+                <div class="activity-stats">
+                    <div class="activity-km">
+                        @a.Kilometers.ToString("F1") km
+                    </div>
+                    <div class="activity-hm">@a.ElevationMeters hm</div>
+                </div>
+            </div>
+        }
+    }
+</div>
+
+@code {
+    private List<Activity> recentActivities = new();
+    private double yearKm;
+    private int yearHm;
+    private int totalRides;
+    private double gravelKm;
+    private double mtbKm;
+    private string greeting = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        greeting = DateTime.Now.Hour switch
+        {
+            < 12 => "Guten Morgen! ☀️",
+            < 18 => "Guten Tag! 🌤️",
+            _ => "Guten Abend! 🌙"
+        };
+
+        var all = await ActivityService.GetActivitiesAsync();
+        var thisYear = all
+            .Where(a => a.Date.Year == DateTime.Today.Year)
+            .ToList();
+
+        yearKm = thisYear.Sum(a => a.Kilometers);
+        yearHm = thisYear.Sum(a => a.ElevationMeters);
+        totalRides = thisYear.Count;
+        gravelKm = thisYear
+            .Where(a => a.BikeType == BikeType.Gravel)
+            .Sum(a => a.Kilometers);
+        mtbKm = thisYear
+            .Where(a => a.BikeType == BikeType.MTB)
+            .Sum(a => a.Kilometers);
+        recentActivities = all.Take(5).ToList();
+    }
+}

@@ -1,0 +1,145 @@
+﻿@page "/templates"
+@using RideLogWeb.Models
+@using RideLogWeb.Services
+@inject ActivityService ActivityService
+
+<h1>📁 Vorlagen</h1>
+
+@if (templates.Count == 0)
+{
+    <div class="empty-state">
+        Noch keine Vorlagen gespeichert 📋
+        <br /><br />
+        <small>Erstelle eine Vorlage beim Erfassen einer Aktivität.</small>
+    </div>
+}
+else
+{
+    <div class="card">
+        @foreach (var t in templates)
+        {
+            <div class="activity-item">
+                <div class="activity-icon">
+                    @(t.BikeType == BikeType.MTB ? "🚵" : "🚴")
+                </div>
+                <div class="activity-info">
+                    <div class="activity-title">@t.Title</div>
+                    <div class="activity-date">@t.BikeType</div>
+                </div>
+                <div class="activity-stats">
+                    <div class="activity-km">
+                        @t.Kilometers.ToString("F1") km
+                    </div>
+                    <div class="activity-hm">@t.ElevationMeters hm</div>
+                </div>
+
+                <!-- Bearbeiten Button -->
+                <button @onclick="() => StartEdit(t)"
+                        style="background:none; border:none;
+                    font-size:18px; cursor:pointer;">
+                    ✏️
+                </button>
+
+                <!-- Löschen Button -->
+                <button @onclick="() => DeleteTemplate(t)"
+                        style="background:none; border:none;
+                    font-size:18px; cursor:pointer;">
+                    🗑️
+                </button>
+            </div>
+
+            <!-- Inline Bearbeiten -->
+            @if (editingTemplate?.Id == t.Id)
+            {
+                <div style="padding:12px; background:#f9f9f9;
+                    border-radius:8px; margin-bottom:8px;">
+
+                    <div class="form-group">
+                        <label>Titel</label>
+                        <input type="text" @bind="editingTemplate.Title" />
+                    </div>
+
+                    <div class="form-group">
+                        <label>Kategorie</label>
+                        <select @bind="editingTemplate.BikeType">
+                            <option value="@BikeType.Gravel">
+                                🚴 Gravel
+                            </option>
+                            <option value="@BikeType.MTB">
+                                🚵 MTB
+                            </option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Kilometer</label>
+                        <input type="number" step="0.1"
+                               @bind="editingTemplate.Kilometers" />
+                    </div>
+
+                    <div class="form-group">
+                        <label>Höhenmeter</label>
+                        <input type="number"
+                               @bind="editingTemplate.ElevationMeters" />
+                    </div>
+
+                    <button class="btn btn-green"
+                            @onclick="SaveEdit">
+                        💾 Speichern
+                    </button>
+                    <button class="btn btn-gray"
+                            @onclick="CancelEdit">
+                        Abbrechen
+                    </button>
+                </div>
+            }
+        }
+    </div>
+}
+
+@code {
+    private List<Activity> templates = new();
+    private Activity? editingTemplate;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        templates = await ActivityService.GetTemplatesAsync();
+    }
+
+    private void StartEdit(Activity template)
+    {
+        editingTemplate = new Activity
+        {
+            Id = template.Id,
+            Title = template.Title,
+            BikeType = template.BikeType,
+            Kilometers = template.Kilometers,
+            ElevationMeters = template.ElevationMeters,
+            IsTemplate = true
+        };
+    }
+
+    private async Task SaveEdit()
+    {
+        if (editingTemplate is null) return;
+        await ActivityService.SaveActivityAsync(editingTemplate);
+        editingTemplate = null;
+        await LoadAsync();
+    }
+
+    private void CancelEdit()
+    {
+        editingTemplate = null;
+    }
+
+    private async Task DeleteTemplate(Activity template)
+    {
+        await ActivityService.DeleteActivityAsync(template);
+        await LoadAsync();
+    }
+}

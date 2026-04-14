@@ -1,0 +1,157 @@
+﻿@page "/add"
+@using RideLogWeb.Models
+@using RideLogWeb.Services
+@inject ActivityService ActivityService
+@inject NavigationManager Navigation
+
+<h1>➕ Neue Aktivität</h1>
+
+<!-- Vorlage auswählen -->
+<div class="card">
+    <div class="form-group">
+        <label>Vorlage (optional)</label>
+        <select @onchange="OnTemplateSelected">
+            <option value="0">-- Vorlage auswählen --</option>
+            @foreach (var t in templates)
+            {
+                <option value="@t.Id">@t.Title</option>
+            }
+        </select>
+    </div>
+</div>
+
+<!-- Formular -->
+<div class="card">
+    <div class="form-group">
+        <label>Datum</label>
+        <input type="date" @bind="activity.Date" />
+    </div>
+
+    <div class="form-group">
+        <label>Titel</label>
+        <input type="text" placeholder="z.B. Arbeitsweg"
+               @bind="activity.Title" />
+    </div>
+
+    <div class="form-group">
+        <label>Kategorie</label>
+        <select @bind="activity.BikeType">
+            <option value="@BikeType.Gravel">🚴 Gravel</option>
+            <option value="@BikeType.MTB">🚵 MTB</option>
+        </select>
+    </div>
+
+    <div class="form-group">
+        <label>Kilometer</label>
+        <input type="number" step="0.1" placeholder="z.B. 10.5"
+               @bind="activity.Kilometers" />
+    </div>
+
+    <div class="form-group">
+        <label>Höhenmeter</label>
+        <input type="number" placeholder="z.B. 200"
+               @bind="activity.ElevationMeters" />
+    </div>
+
+    <div class="form-group">
+        <label>Dauer in Minuten (optional)</label>
+        <input type="number" placeholder="z.B. 45"
+               @bind="activity.DurationMinutes" />
+    </div>
+
+    <div class="form-group">
+        <label>Notiz (optional)</label>
+        <textarea placeholder="Kommentar zur Fahrt..."
+                  @bind="activity.Note"></textarea>
+    </div>
+
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div style="color:red; margin-bottom:12px;">@errorMessage</div>
+    }
+
+    @if (successMessage)
+    {
+        <div style="color:green; margin-bottom:12px;">
+            ✅ Aktivität gespeichert!
+        </div>
+    }
+
+    <button class="btn btn-green" @onclick="SaveActivity">
+        💾 Aktivität speichern
+    </button>
+
+    <button class="btn btn-blue" @onclick="SaveAsTemplate">
+        📋 Als Vorlage speichern
+    </button>
+</div>
+
+@code {
+    private Activity activity = new();
+    private List<Activity> templates = new();
+    private string errorMessage = string.Empty;
+    private bool successMessage = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        templates = await ActivityService.GetTemplatesAsync();
+    }
+
+    private void OnTemplateSelected(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var id) && id > 0)
+        {
+            var template = templates.FirstOrDefault(t => t.Id == id);
+            if (template is not null)
+            {
+                activity.Title = template.Title;
+                activity.BikeType = template.BikeType;
+                activity.Kilometers = template.Kilometers;
+                activity.ElevationMeters = template.ElevationMeters;
+            }
+        }
+    }
+
+    private async Task SaveActivity()
+    {
+        errorMessage = string.Empty;
+        successMessage = false;
+
+        if (string.IsNullOrWhiteSpace(activity.Title))
+        {
+            errorMessage = "Bitte einen Titel eingeben.";
+            return;
+        }
+
+        if (activity.Kilometers <= 0)
+        {
+            errorMessage = "Bitte gültige Kilometer eingeben.";
+            return;
+        }
+
+        activity.IsTemplate = false;
+        await ActivityService.SaveActivityAsync(activity);
+
+        successMessage = true;
+        activity = new();
+    }
+
+    private async Task SaveAsTemplate()
+    {
+        if (string.IsNullOrWhiteSpace(activity.Title)) return;
+
+        var template = new Activity
+        {
+            Title = activity.Title,
+            BikeType = activity.BikeType,
+            Kilometers = activity.Kilometers,
+            ElevationMeters = activity.ElevationMeters,
+            IsTemplate = true
+        };
+
+        await ActivityService.SaveActivityAsync(template);
+        templates = await ActivityService.GetTemplatesAsync();
+
+        successMessage = true;
+    }
+}
